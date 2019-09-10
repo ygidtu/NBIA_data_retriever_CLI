@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/voxelbrain/goptions"
@@ -35,9 +34,6 @@ func SetupCloseHandler() {
 
 func SetLogger() zerolog.Logger {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	if gin.IsDebugging() {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	}
 
 	output := zerolog.ConsoleWriter{
 		Out:        os.Stderr,

@@ -87,7 +87,7 @@ func (info *FileInfo) Download(output string) {
 	outputFile := info.getOutput(output)
 	info.ToJson(outputFile)
 
-	log.Printf("Downlaod %s to %s", info.Url, outputFile)
+	log.Info().Msgf("Download %s to %s", info.Url, outputFile)
 
 	var start int64
 	if stat, err := os.Stat(outputFile); os.IsNotExist(err) {
