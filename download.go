@@ -71,7 +71,7 @@ func (info *FileInfo) Get() {
 }
 
 func (info *FileInfo) getOutput(output string) string {
-	outputDir := filepath.Join(output, info.Collection, info.PatientId, info.Date)
+	outputDir := filepath.Join(output, info.Collection, info.PatientId, info.StudyUID, info.Date)
 
 	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 		if err = os.MkdirAll(outputDir, 0755); err != nil {
@@ -179,7 +179,6 @@ func (info *FileInfo) ToJson(outputFile string) {
 		log.Error().Msgf("%v", err)
 	}
 }
-
 
 func (info *FileInfo) ToString() string {
 	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s", info.Url, info.Collection, info.PatientId, info.StudyUID, info.SeriesUID, info.Size, info.NumOfImages, info.Date)
