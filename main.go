@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -51,15 +52,6 @@ func SetLogger() zerolog.Logger {
 	return zerolog.New(output).With().Timestamp().Logger()
 }
 
-func downloadWrapper(input chan *FileInfo) {
-	for i := range input {
-		i.Get()
-		if !meta {
-			i.Download(output)
-		}
-	}
-}
-
 func main() {
 	SetupCloseHandler()
 	SetLogger()
@@ -90,23 +82,36 @@ func main() {
 	}
 
 	if options.Version {
-		println("Current version is 0.1.0")
+		println("Current version is 0.1.1")
 	} else {
 		proxy = options.Proxy
 		timeout = time.Duration(options.Timeout) * time.Second
 		output = options.Output
 		meta = options.Meta
+		var wg sync.WaitGroup
 
 		files := DecodeTCIA(options.InputFile)
 
+		wg.Add(options.Num)
 		inputChan := make(chan *FileInfo, 5)
 		for i := 0; i < options.Num; i++ {
-			go downloadWrapper(inputChan)
+
+			go func(input chan *FileInfo) {
+				defer wg.Done()
+				for i := range input {
+					i.Get()
+					if !meta {
+						i.Download(output)
+					}
+				}
+			}(inputChan)
 		}
 
 		for _, f := range files {
 			inputChan <- f
 		}
+		close(inputChan)
+		wg.Wait()
 
 		if meta {
 			ToFile(files, output)
