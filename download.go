@@ -3,12 +3,13 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"github.com/rs/zerolog/log"
 	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/rs/zerolog/log"
 
 	"fmt"
 
@@ -18,8 +19,9 @@ import (
 
 	"strings"
 
-	"github.com/cheggaaa/pb/v3"
 	"net/http"
+
+	"github.com/cheggaaa/pb/v3"
 )
 
 type FileInfo struct {
@@ -54,7 +56,7 @@ func (info *FileInfo) Get() {
 
 	info.Collection = data[0]
 	info.PatientId = data[1]
-	info.PatientId = data[2]
+	info.StudyUID = data[2]
 	info.SeriesUID = data[3]
 
 	if size, err := strconv.ParseInt(data[6], 10, 64); err != nil {
@@ -151,7 +153,7 @@ func (info *FileInfo) Download(output string) {
 		writer, err := os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
 		defer writer.Close()
 
-		reader := io.LimitReader(resp.Body, info.Size - start)
+		reader := io.LimitReader(resp.Body, info.Size-start)
 
 		// start new bar
 		bar := pb.Full.Start64(info.Size - start)
@@ -170,7 +172,7 @@ func (info *FileInfo) Download(output string) {
 }
 
 func (info *FileInfo) ToJson(outputFile string) {
-	rankingsJson, _ := json.Marshal(info)
+	rankingsJson, _ := json.MarshalIndent(info, "", "    ")
 	err := ioutil.WriteFile(fmt.Sprintf("%s.json", outputFile), rankingsJson, 0644)
 
 	if err != nil {
