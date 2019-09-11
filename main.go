@@ -2,21 +2,23 @@ package main
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/voxelbrain/goptions"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"github.com/voxelbrain/goptions"
 )
 
 var (
 	timeout = time.Duration(120000 * time.Second)
 	proxy   = ""
 	baseURL = ""
-	output = ""
+	output  = ""
+	meta    = false
 )
 
 // SetupCloseHandler creates a 'listener' on a new goroutine which will notify the
@@ -49,15 +51,14 @@ func SetLogger() zerolog.Logger {
 	return zerolog.New(output).With().Timestamp().Logger()
 }
 
-
 func downloadWrapper(input chan *FileInfo) {
 	for i := range input {
 		i.Get()
-		i.Download(output)
+		if !meta {
+			i.Download(output)
+		}
 	}
 }
-
-
 
 func main() {
 	SetupCloseHandler()
@@ -65,19 +66,21 @@ func main() {
 
 	options := struct {
 		InputFile string `goptions:"-i, --input, description='Path to tcia file'"`
-		Output      string `goptions:"-o, --output, description='Output directory'"`
+		Output    string `goptions:"-o, --output, description='Output directory, or output file when --meta enabled'"`
 		Proxy     string `goptions:"-x, --proxy, description='Proxy'"`
 		Timeout   int64  `goptions:"-t, --timeout, description='Due to limitation of target server, please set this timeout value as big as possible'"`
-		Num int `goptions:"-p, --process, description='Start how many download at same time'"`
+		Num       int    `goptions:"-p, --process, description='Start how many download at same time'"`
+		Meta      bool   `goptions:"-m, --meta, description='Get Meta info of all files'"`
 		Version   bool   `goptions:"-v, --version, description='Show version'"`
 		Debug     bool   `goptions:"--debug, description='Show debug info'"`
 
 		Help goptions.Help `goptions:"--help, description='Show this help'"`
 	}{
-		Output:     "downloads",
+		Output:  "downloads",
 		Proxy:   "",
 		Timeout: 1200000,
-		Num:1,
+		Num:     1,
+		Meta:    false,
 	}
 	goptions.ParseAndFail(&options)
 
@@ -87,23 +90,27 @@ func main() {
 	}
 
 	if options.Version {
-		println("Current version is 0.0.1")
+		println("Current version is 0.1.0")
 	} else {
 		proxy = options.Proxy
 		timeout = time.Duration(options.Timeout) * time.Second
 		output = options.Output
+		meta = options.Meta
 
 		files := DecodeTCIA(options.InputFile)
 
 		inputChan := make(chan *FileInfo, 5)
-		for i := 0; i < options.Num; i ++ {
+		for i := 0; i < options.Num; i++ {
 			go downloadWrapper(inputChan)
 		}
 
-
-
 		for _, f := range files {
 			inputChan <- f
+		}
+
+		if meta {
+			ToFile(files, output)
+			ToJson(files, fmt.Sprintf("%s.json", output))
 		}
 	}
 }

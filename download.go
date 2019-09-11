@@ -179,3 +179,8 @@ func (info *FileInfo) ToJson(outputFile string) {
 		log.Error().Msgf("%v", err)
 	}
 }
+
+
+func (info *FileInfo) ToString() string {
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s", info.Url, info.Collection, info.PatientId, info.StudyUID, info.SeriesUID, info.Size, info.NumOfImages, info.Date)
+}
