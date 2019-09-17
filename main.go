@@ -99,9 +99,12 @@ func main() {
 			go func(input chan *FileInfo) {
 				defer wg.Done()
 				for i := range input {
-					i.Get()
-					if !meta {
-						i.Download(output)
+					if _, err := os.Stat(fmt.Sprintf("%s.json", i.GetOutput(output))); os.IsNotExist(err) {
+						i.Get()
+						if !meta {
+							i.Download(output)
+							i.ToJson(output)
+						}
 					}
 				}
 			}(inputChan)
@@ -114,7 +117,6 @@ func main() {
 		wg.Wait()
 
 		if meta {
-			ToFile(files, output)
 			ToJson(files, fmt.Sprintf("%s.json", output))
 		}
 	}

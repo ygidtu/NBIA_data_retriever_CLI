@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/tar"
+
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
@@ -8,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+
 
 	"github.com/rs/zerolog/log"
 
@@ -20,8 +23,6 @@ import (
 	"strings"
 
 	"net/http"
-
-	"github.com/cheggaaa/pb/v3"
 )
 
 type FileInfo struct {
@@ -33,6 +34,7 @@ type FileInfo struct {
 	Size        int64
 	NumOfImages int
 	Date        string
+	Total 		[]string
 }
 
 func (info *FileInfo) Get() {
@@ -49,6 +51,7 @@ func (info *FileInfo) Get() {
 	}
 
 	data := strings.Split(string(content), "|")
+	info.Total = data
 
 	if len(data) < 11 {
 		log.Error().Msgf("%v less than 11 elements", data)
@@ -70,8 +73,8 @@ func (info *FileInfo) Get() {
 	log.Printf("%v", info)
 }
 
-func (info *FileInfo) getOutput(output string) string {
-	outputDir := filepath.Join(output, info.Collection, info.PatientId, info.StudyUID, info.Date)
+func (info *FileInfo) GetOutput(output string) string {
+	outputDir := filepath.Join(output, info.Collection, info.PatientId, info.StudyUID, info.Date, info.SeriesUID)
 
 	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 		if err = os.MkdirAll(outputDir, 0755); err != nil {
@@ -79,101 +82,137 @@ func (info *FileInfo) getOutput(output string) string {
 		}
 	}
 
-	outputFile := fmt.Sprintf("%s/%s.dcm", outputDir, strings.Replace(info.SeriesUID, ".", "-", -1))
+	return outputDir
+}
 
-	return outputFile
+
+// Untar takes a destination path and a reader; a tar reader loops over the tarfile
+// creating the file structure at 'dst' along the way, and writing any files
+func Untar(dst string, r io.Reader) error {
+
+	tr := tar.NewReader(r)
+
+	for {
+		header, err := tr.Next()
+
+		switch {
+
+		// if no more files are found return
+		case err == io.EOF:
+			return nil
+
+		// return any other error
+		case err != nil:
+			return err
+
+		// if the header is nil, just skip it (not sure how this happens)
+		case header == nil:
+			continue
+		}
+
+		// the target location where the dir/file should be created
+		target := filepath.Join(dst, header.Name)
+
+		// the following switch could also be done using fi.Mode(), not sure if there
+		// a benefit of using one vs. the other.
+		// fi := header.FileInfo()
+
+		// check the file type
+		switch header.Typeflag {
+
+		// if its a dir and it doesn't exist create it
+		case tar.TypeDir:
+			if _, err := os.Stat(target); err != nil {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+			}
+
+		// if it's a file create it
+		case tar.TypeReg:
+			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			if err != nil {
+				return err
+			}
+
+			// copy over contents
+			if _, err := io.Copy(f, tr); err != nil {
+				return err
+			}
+
+			// manually close here after each file operation; defering would cause each file close
+			// to wait until all operations have completed.
+			f.Close()
+		}
+	}
 }
 
 func (info *FileInfo) Download(output string) {
 
-	outputFile := info.getOutput(output)
-	info.ToJson(outputFile)
+	log.Debug().Msgf("%v", info)
 
-	log.Info().Msgf("Download %s to %s", info.Url, outputFile)
-
-	var start int64
-	if stat, err := os.Stat(outputFile); os.IsNotExist(err) {
-		start = 0
-		_, err = os.Create(outputFile)
-	} else {
-		log.Debug().Msgf("%s exists", outputFile)
-		start = stat.Size()
+	outputFile := info.GetOutput(output)
+	
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true},
+		ResponseHeaderTimeout: timeout,
 	}
 
-	if start >= info.Size {
-		log.Info().Msgf("Skip")
-		return
-	} else {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true},
+	if proxy != "" {
+		log.Info().Msgf(proxy)
+		proxyURL, err := url.Parse(proxy)
+		if err != nil {
+			log.Error().Msgf("%v", err)
+		}
+
+		tr = &http.Transport{
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
+			Proxy:                 http.ProxyURL(proxyURL),
 			ResponseHeaderTimeout: timeout,
 		}
-
-		if proxy != "" {
-			proxyURL, err := url.Parse(proxy)
-			if err != nil {
-				log.Error().Msgf("%v", err)
-			}
-
-			tr = &http.Transport{
-				TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-				Proxy:                 http.ProxyURL(proxyURL),
-				ResponseHeaderTimeout: timeout,
-			}
-		}
-
-		req, err := http.NewRequest("POST", baseURL, nil)
-		if err != nil {
-			log.Error().Msgf("%v", err)
-		}
-		// custom the request header
-		req.Header.Add("password", "")
-		req.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=ISO-8859-1")
-		req.Header.Add("Connection", "Keep-Alive")
-
-		// custom the request form
-		form, _ := url.ParseQuery(req.URL.RawQuery)
-		form.Add("Range", fmt.Sprintf("bytes=%d-%d", start, info.Size))
-		form.Add("hasAnnotation", "false")
-		form.Add("includeAnnotation", "true")
-		form.Add("seriesUid", info.SeriesUID)
-		form.Add("sopUids", "")
-		form.Add("userId", "")
-		form.Add("password", "")
-		req.URL.RawQuery = form.Encode()
-
-		client := &http.Client{Transport: tr, Timeout: timeout}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Error().Msgf("%v", err)
-		}
-
-		writer, err := os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
-		defer writer.Close()
-
-		reader := io.LimitReader(resp.Body, info.Size-start)
-
-		// start new bar
-		bar := pb.Full.Start64(info.Size - start)
-		// create proxy reader
-		barReader := bar.NewProxyReader(reader)
-		// copy from proxy reader
-		_, err = io.Copy(writer, barReader)
-		// finish bar
-		bar.Finish()
-
-		if err != nil {
-			log.Error().Msgf("%v", err)
-		}
 	}
 
+	// custom the request form
+	form := url.Values{}
+	form.Add("Range", fmt.Sprintf("bytes=0-"))
+	form.Add("hasAnnotation", "false")
+	form.Add("includeAnnotation", "true")
+	form.Add("seriesUid", info.SeriesUID)
+	form.Add("sopUids", "")
+	form.Add("userId", "")
+	form.Add("password", "")
+
+	req, err := http.NewRequest("POST", baseURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		log.Error().Msgf("%v", err)
+	}
+	// custom the request header
+	req.Header.Add("password", "")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=ISO-8859-1")
+	req.Header.Add("Connection", "Keep-Alive")
+
+	log.Info().Msgf("Download %s to %s", req.URL, outputFile)
+
+	client := &http.Client{Transport: tr, Timeout: timeout}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Error().Msgf("%v", err)
+		os.Exit(1)
+	}
+
+	log.Info().Msgf(outputFile)
+	err = Untar(outputFile, resp.Body)
+
+	if err != nil {
+		log.Error().Msgf("%v", err)
+	}
 }
 
-func (info *FileInfo) ToJson(outputFile string) {
+func (info *FileInfo) ToJson(output string) {
 	rankingsJson, _ := json.MarshalIndent(info, "", "    ")
-	err := ioutil.WriteFile(fmt.Sprintf("%s.json", outputFile), rankingsJson, 0644)
+	err := ioutil.WriteFile(fmt.Sprintf("%s.json", info.GetOutput(output)), rankingsJson, 0644)
 
 	if err != nil {
 		log.Error().Msgf("%v", err)
