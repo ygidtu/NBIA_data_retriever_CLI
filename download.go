@@ -192,7 +192,7 @@ func (info *FileInfo) Download(output string) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=ISO-8859-1")
 	req.Header.Add("Connection", "Keep-Alive")
 
-	log.Info().Msgf("Download %s to %s", req.URL, outputFile)
+	log.Info().Msgf("Download %s to %s", info.SeriesUID, outputFile)
 
 	client := &http.Client{Transport: tr, Timeout: timeout}
 
@@ -202,7 +202,6 @@ func (info *FileInfo) Download(output string) {
 		os.Exit(1)
 	}
 
-	log.Info().Msgf(outputFile)
 	err = Untar(outputFile, resp.Body)
 
 	if err != nil {
