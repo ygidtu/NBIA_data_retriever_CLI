@@ -95,7 +95,6 @@ func (info *FileInfo) Download(output string) error {
 	}
 
 	if proxy != "" {
-		log.Info().Msgf(proxy)
 		proxyURL, err := url.Parse(proxy)
 		if err != nil {
 			return err
