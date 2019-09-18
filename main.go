@@ -82,7 +82,7 @@ func main() {
 	}
 
 	if options.Version {
-		println("Current version is 0.2.1")
+		println("Current version is 0.2.2")
 	} else {
 		proxy = options.Proxy
 		timeout = time.Duration(options.Timeout) * time.Second
@@ -102,8 +102,11 @@ func main() {
 					i.Get()
 					if _, err := os.Stat(fmt.Sprintf("%s.json", i.GetOutput(output))); os.IsNotExist(err) {
 						if !meta {
-							i.Download(output)
-							i.ToJson(output)
+							if err := i.Download(output); err != nil {
+								log.Error().Msgf("Download %s failed - %s", i.SeriesUID, err)
+							} else {
+								i.ToJson(output)
+							}
 						}
 					} else {
 						log.Info().Msgf("Skip %s", i.SeriesUID)
