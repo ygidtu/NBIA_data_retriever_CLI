@@ -7,19 +7,17 @@
 ## Command line usage
 
 ```bash
-Usage: nbia_cli_darwin [global options]                                       │
-                                                                              │
-Global options:                                                               │
-        -i, --input   Path to tcia file                                       │
-        -o, --output  Output directory, or output file when --meta enabled (de│
-fault: downloads)                                                             │
-        -x, --proxy   Proxy                                                   │
-        -t, --timeout Due to limitation of target server, please set this time│
-out value as big as possible (default: 1200000)                               │
-        -p, --process Start how many download at same time (default: 1)       │
-        -m, --meta    Get Meta info of all files                              │
-        -v, --version Show version                                            │
-            --debug   Show debug info                                         │
+Usage: nbia_cli_darwin [global options]                                       
+                                                                              
+Global options:                                                               
+        -i, --input   Path to tcia file                                       
+        -o, --output  Output directory, or output file when --meta enabled (default: downloads)                                                             
+        -x, --proxy   Proxy                                                   
+        -t, --timeout Due to limitation of target server, please set this time out value as big as possible (default: 1200000)                               
+        -p, --process Start how many download at same time (default: 1)       
+        -m, --meta    Get Meta info of all files                              
+        -v, --version Show version                                            
+            --debug   Show debug info                                         
             --help    Show this help
 ```
 
