@@ -4,6 +4,27 @@
 
 ---
 
+## Command line usage
+
+```bash
+Usage: nbia_cli_darwin [global options]                                       │
+                                                                              │
+Global options:                                                               │
+        -i, --input   Path to tcia file                                       │
+        -o, --output  Output directory, or output file when --meta enabled (de│
+fault: downloads)                                                             │
+        -x, --proxy   Proxy                                                   │
+        -t, --timeout Due to limitation of target server, please set this time│
+out value as big as possible (default: 1200000)                               │
+        -p, --process Start how many download at same time (default: 1)       │
+        -m, --meta    Get Meta info of all files                              │
+        -v, --version Show version                                            │
+            --debug   Show debug info                                         │
+            --help    Show this help
+```
+
+---
+
 ### [Update 2019.09.17] 
 Just noticed original NBIA add tar wrapper of real dcm files
 
@@ -29,3 +50,4 @@ Known issues:
 - The `public.cancerimagingarchive.net/nbia-download/servlet` use `POST` to transfer data from server to local
 , the connection may be terminated even before the download is complete. Therefore, **PLEASE** set timeout as huge as possible
 - progress bar is a mess when using multiple process
+- I do not have a account of NBIA, therefore this program could not handle the restricted data for now.
