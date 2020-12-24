@@ -35,8 +35,9 @@ ListOfSeriesToDownload=
 
 const downloadLinePrefix = "downloadServerUrl="
 const versionPrefix = "manifestVersion="
-const downloadUrlConnect = "numberOfSeries=1&series1="
+const downloadURLConnect = "numberOfSeries=1&series1="
 
+// DecodeTCIA is used to decode the tcia file
 func DecodeTCIA(path string) []*FileInfo {
 	res := make([]*FileInfo, 0, 0)
 
@@ -61,7 +62,7 @@ func DecodeTCIA(path string) []*FileInfo {
 			}
 			baseURL = fmt.Sprintf("%sV%s", baseURL, version)
 		} else if !strings.ContainsAny(line, "=") {
-			res = append(res, &FileInfo{Url: fmt.Sprintf("%s?%s%s", baseURL, downloadUrlConnect, line)})
+			res = append(res, &FileInfo{URL: fmt.Sprintf("%s?%s%s", baseURL, downloadURLConnect, line)})
 		}
 	}
 

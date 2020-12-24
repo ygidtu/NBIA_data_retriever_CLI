@@ -35,6 +35,7 @@ func SetupCloseHandler() {
 	}()
 }
 
+// SetLogger as name says
 func SetLogger() zerolog.Logger {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
@@ -63,6 +64,8 @@ func main() {
 		Timeout   int64  `goptions:"-t, --timeout, description='Due to limitation of target server, please set this timeout value as big as possible'"`
 		Num       int    `goptions:"-p, --process, description='Start how many download at same time'"`
 		Meta      bool   `goptions:"-m, --meta, description='Get Meta info of all files'"`
+		Username  string `goptions:"-u, --username, description='Username for control data'"`
+		Password  string `goptions:"-w, --passwd, description='Password for control data'"`
 		Version   bool   `goptions:"-v, --version, description='Show version'"`
 		Debug     bool   `goptions:"--debug, description='Show debug info'"`
 
@@ -82,7 +85,7 @@ func main() {
 	}
 
 	if options.Version {
-		println("Current version is 0.2.2")
+		println("Current version is 0.2.3")
 	} else {
 		proxy = options.Proxy
 		timeout = time.Duration(options.Timeout) * time.Second
@@ -102,10 +105,10 @@ func main() {
 					i.Get()
 					if _, err := os.Stat(fmt.Sprintf("%s.json", i.GetOutput(output))); os.IsNotExist(err) {
 						if !meta {
-							if err := i.Download(output); err != nil {
+							if err := i.Download(output, options.Username, options.Password); err != nil {
 								log.Error().Msgf("Download %s failed - %s", i.SeriesUID, err)
 							} else {
-								i.ToJson(output)
+								i.ToJSON(output)
 							}
 						}
 					} else {
@@ -122,7 +125,7 @@ func main() {
 		wg.Wait()
 
 		if meta {
-			ToJson(files, fmt.Sprintf("%s.json", output))
+			ToJSON(files, fmt.Sprintf("%s.json", output))
 		}
 	}
 }

@@ -3,15 +3,18 @@ package main
 import (
 	"archive/tar"
 	"encoding/json"
-	"github.com/rs/zerolog/log"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/rs/zerolog/log"
 )
 
-// Untar takes a destination path and a reader; a tar reader loops over the tarfile
-// creating the file structure at 'dst' along the way, and writing any files
+/*
+UnTar takes a destination path and a reader; a tar reader loops over the tarfile
+creating the file structure at 'dst' along the way, and writing any files
+*/
 func UnTar(dst string, r io.Reader) error {
 
 	tr := tar.NewReader(r)
@@ -71,9 +74,10 @@ func UnTar(dst string, r io.Reader) error {
 	}
 }
 
-func ToJson(files []*FileInfo, output string) {
-	rankingsJson, _ := json.MarshalIndent(files, "", "    ")
-	err := ioutil.WriteFile(output, rankingsJson, 0644)
+// ToJSON as name says
+func ToJSON(files []*FileInfo, output string) {
+	rankingsJSON, _ := json.MarshalIndent(files, "", "    ")
+	err := ioutil.WriteFile(output, rankingsJSON, 0644)
 
 	if err != nil {
 		log.Error().Msgf("%v", err)

@@ -22,10 +22,11 @@ import (
 	"net/http"
 )
 
+// FileInfo is struct handle all the information of one tcia file
 type FileInfo struct {
-	Url         string
+	URL         string
 	Collection  string
-	PatientId   string
+	PatientID   string
 	StudyUID    string
 	SeriesUID   string
 	Size        int64
@@ -34,9 +35,10 @@ type FileInfo struct {
 	Total       []string
 }
 
+// Get main API to decode the file information
 func (info *FileInfo) Get() {
-	log.Info().Msgf("Getting %s", info.Url)
-	resp, err := http.Post(info.Url, "application/x-www-form-urlencoded; charset=ISO-8859-1", bytes.NewReader([]byte("")))
+	log.Info().Msgf("Getting %s", info.URL)
+	resp, err := http.Post(info.URL, "application/x-www-form-urlencoded; charset=ISO-8859-1", bytes.NewReader([]byte("")))
 
 	if err != nil {
 		log.Error().Msgf("%v", err)
@@ -55,7 +57,7 @@ func (info *FileInfo) Get() {
 	}
 
 	info.Collection = data[0]
-	info.PatientId = data[1]
+	info.PatientID = data[1]
 	info.StudyUID = data[2]
 	info.SeriesUID = data[3]
 
@@ -70,8 +72,9 @@ func (info *FileInfo) Get() {
 	log.Printf("%v", info)
 }
 
+// GetOutput construct the output directory
 func (info *FileInfo) GetOutput(output string) string {
-	outputDir := filepath.Join(output, info.Collection, info.PatientId, info.StudyUID, info.Date, info.SeriesUID)
+	outputDir := filepath.Join(output, info.Collection, info.PatientID, info.StudyUID, info.Date, info.SeriesUID)
 
 	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 		if err = os.MkdirAll(outputDir, 0755); err != nil {
@@ -82,7 +85,8 @@ func (info *FileInfo) GetOutput(output string) string {
 	return outputDir
 }
 
-func (info *FileInfo) Download(output string) error {
+// Download is real function to downlaod file
+func (info *FileInfo) Download(output, username, password string) error {
 
 	log.Debug().Msgf("%v", info)
 
@@ -114,8 +118,8 @@ func (info *FileInfo) Download(output string) error {
 	form.Add("includeAnnotation", "true")
 	form.Add("seriesUid", info.SeriesUID)
 	form.Add("sopUids", "")
-	form.Add("userId", "")
-	form.Add("password", "")
+	form.Add("userId", username)
+	form.Add("password", password)
 
 	req, err := http.NewRequest("POST", baseURL, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -138,15 +142,17 @@ func (info *FileInfo) Download(output string) error {
 	return UnTar(outputFile, resp.Body)
 }
 
-func (info *FileInfo) ToJson(output string) {
-	rankingsJson, _ := json.MarshalIndent(info, "", "    ")
-	err := ioutil.WriteFile(fmt.Sprintf("%s.json", info.GetOutput(output)), rankingsJson, 0644)
+// ToJSON is used to save downlaod file information and log the download progress
+func (info *FileInfo) ToJSON(output string) {
+	rankingsJSON, _ := json.MarshalIndent(info, "", "    ")
+	err := ioutil.WriteFile(fmt.Sprintf("%s.json", info.GetOutput(output)), rankingsJSON, 0644)
 
 	if err != nil {
 		log.Error().Msgf("%v", err)
 	}
 }
 
+// ToString is used to convert file info as string for human
 func (info *FileInfo) ToString() string {
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s", info.Url, info.Collection, info.PatientId, info.StudyUID, info.SeriesUID, info.Size, info.NumOfImages, info.Date)
+	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s", info.URL, info.Collection, info.PatientID, info.StudyUID, info.SeriesUID, info.Size, info.NumOfImages, info.Date)
 }
