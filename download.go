@@ -118,8 +118,11 @@ func (info *FileInfo) Download(output, username, password string) error {
 	form.Add("includeAnnotation", "true")
 	form.Add("seriesUid", info.SeriesUID)
 	form.Add("sopUids", "")
-	form.Add("userId", username)
-	form.Add("password", password)
+
+	if username != "" && password != "" {
+		form.Add("userId", username)
+		form.Add("password", password)
+	}
 
 	req, err := http.NewRequest("POST", baseURL, strings.NewReader(form.Encode()))
 	if err != nil {
