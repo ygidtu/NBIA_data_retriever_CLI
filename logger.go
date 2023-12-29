@@ -8,10 +8,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var (
-	logger *zap.SugaredLogger
-)
-
 // newEncoderConfig create EncoderConfig for zap
 func newEncoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
