@@ -8,8 +8,8 @@ import (
 
 var (
 	TokenUrl = "https://services.cancerimagingarchive.net/nbia-api/oauth/token"
-	TagUrl   = "https://services.cancerimagingarchive.net/nbia-api/services/getDicomTags"
-	MetaUrl  = "https://services.cancerimagingarchive.net/nbia-api/services/getSeriesMetadata2"
+	ImageUrl = "https://services.cancerimagingarchive.net/nbia-api/services/v2/getImage"
+	MetaUrl  = "https://services.cancerimagingarchive.net/nbia-api/services/v2/getSeriesMetaData"
 )
 
 // Options command line parameters
@@ -17,7 +17,6 @@ type Options struct {
 	Input      string
 	Output     string
 	Proxy      string
-	Timeout    int
 	Concurrent int
 	Meta       bool
 	Username   string
@@ -25,6 +24,9 @@ type Options struct {
 	Version    bool
 	Debug      bool
 	Help       bool
+	MetaUrl    string
+	TokenUrl   string
+	ImageUrl   string
 
 	opt *getoptions.GetOpt
 }
@@ -46,8 +48,6 @@ func InitOptions() *Options {
 		opt.opt.Description("Output directory, or output file when --meta enabled"))
 	opt.opt.StringVar(&opt.Proxy, "proxy", "", opt.opt.Alias("x"),
 		opt.opt.Description("the proxy to use [http, socks5://user:passwd@host:port]"))
-	opt.opt.IntVar(&opt.Timeout, "timeout", 120000, opt.opt.Alias("t"),
-		opt.opt.Description("due to limitation of target server, please set this timeout value as big as possible"))
 	opt.opt.IntVar(&opt.Concurrent, "processes", 1, opt.opt.Alias("p"),
 		opt.opt.Description("start how many download at same time"))
 	opt.opt.BoolVar(&opt.Meta, "meta", false, opt.opt.Alias("m"),
@@ -56,6 +56,12 @@ func InitOptions() *Options {
 		opt.opt.Description("username for control data"))
 	opt.opt.StringVar(&opt.Password, "passwd", "", opt.opt.Alias("w"),
 		opt.opt.Description("password for control data"))
+	opt.opt.StringVar(&opt.TokenUrl, "token-url", TokenUrl,
+		opt.opt.Description("the api url of login token"))
+	opt.opt.StringVar(&opt.MetaUrl, "meta-url", MetaUrl,
+		opt.opt.Description("the api url get meta data"))
+	opt.opt.StringVar(&opt.MetaUrl, "image-url", ImageUrl,
+		opt.opt.Description("the api url to download image data"))
 
 	_, err := opt.opt.Parse(os.Args[1:])
 	if err != nil {
@@ -71,5 +77,18 @@ func InitOptions() *Options {
 		os.Exit(1)
 	}
 
+	if opt.TokenUrl != "" && opt.TokenUrl != TokenUrl {
+		TokenUrl = opt.TokenUrl
+		logger.Infof("Using custom token url: %s", TokenUrl)
+	}
+
+	if opt.MetaUrl != "" && opt.MetaUrl != MetaUrl {
+		MetaUrl = opt.MetaUrl
+		logger.Infof("Using custom meta url: %s", MetaUrl)
+	}
+	if opt.ImageUrl != "" && opt.ImageUrl != ImageUrl {
+		ImageUrl = opt.ImageUrl
+		logger.Infof("Using custom image url: %s", ImageUrl)
+	}
 	return opt
 }
