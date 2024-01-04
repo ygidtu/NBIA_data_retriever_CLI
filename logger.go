@@ -3,6 +3,7 @@ package main
 import (
 	"go.uber.org/zap"
 	"os"
+	"path/filepath"
 	"time"
 
 	"go.uber.org/zap/zapcore"
@@ -32,20 +33,29 @@ func timeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 }
 
 // setLogger init the zap logger
-func setLogger(debug bool) {
+func setLogger(debug bool, logfile string) {
 	encoder := newEncoderConfig()
 	level := zap.InfoLevel
 	if debug {
 		level = zap.DebugLevel
 	}
 
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoder),
-		zapcore.AddSync(os.Stdout),
-		level,
-	)
-
+	core := zapcore.NewCore(zapcore.NewConsoleEncoder(encoder), zapcore.AddSync(os.Stdout), level)
 	logger_ := zap.New(core, zap.AddCaller())
+	if logfile != "" {
+		_ = os.MkdirAll(filepath.Dir(logfile), os.ModePerm)
+		f, err := os.OpenFile(logfile, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, os.ModePerm)
+		if err != nil {
+			logger.Warnf("failed save log to %s: %v", logfile, err)
+		} else {
+			core = zapcore.NewTee(
+				zapcore.NewCore(zapcore.NewJSONEncoder(encoder), zapcore.AddSync(f), zap.DebugLevel),
+				zapcore.NewCore(zapcore.NewConsoleEncoder(encoder), zapcore.AddSync(os.Stdout), level),
+			)
+		}
+		logger_ = zap.New(core, zap.AddCaller())
+	}
+
 	defer logger_.Sync()
 	logger = logger_.Sugar()
 }

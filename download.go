@@ -14,6 +14,7 @@ import (
 
 // decodeTCIA is used to decode the tcia file
 func decodeTCIA(path string) []*FileInfo {
+	logger.Debugf("decoding tcia file: %s", path)
 	res := make([]*FileInfo, 0)
 
 	f, err := os.Open(path)
@@ -28,7 +29,7 @@ func decodeTCIA(path string) []*FileInfo {
 		line := scanner.Text()
 
 		if !strings.ContainsAny(line, "=") {
-
+			logger.Debugf("tcia file id: %s", line)
 			url_, err := makeURL(MetaUrl, map[string]interface{}{"SeriesInstanceUID": line})
 			req, err := http.NewRequest("GET", url_, nil)
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
@@ -49,7 +50,8 @@ func decodeTCIA(path string) []*FileInfo {
 			files := make([]*FileInfo, 0)
 			err = json.Unmarshal(content, &files)
 			if err != nil {
-				logger.Errorf("failed to parse response data: %v - %s", err, content)
+				logger.Errorf("failed to parse response data: %v", err)
+				logger.Debugf("%s", content)
 			}
 
 			res = append(res, files...)
@@ -102,6 +104,7 @@ func (info *FileInfo) DcimFiles(output string) string {
 }
 
 func (info *FileInfo) GetMeta(output string) error {
+	logger.Debugf("getting meta information and save to %s", output)
 	f, err := os.OpenFile(info.MetaFile(output), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("failed to open meta file %s: %v", info.MetaFile(output), err)
@@ -119,7 +122,7 @@ func (info *FileInfo) GetMeta(output string) error {
 
 // Download is real function to download file
 func (info *FileInfo) Download(output string) error {
-
+	logger.Debugf("getting image file to %s", output)
 	url_, err := makeURL(ImageUrl, map[string]interface{}{"SeriesInstanceUID": info.SeriesUID})
 	req, err := http.NewRequest("GET", url_, nil)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))

@@ -46,6 +46,7 @@ func makeURL(url_ string, values map[string]interface{}) (string, error) {
 
 // NewToken create token from official NBIA API
 func NewToken(username, passwd, path string) (*Token, error) {
+	logger.Debugf("creating token")
 	token := new(Token)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		logger.Infof("restore token from %v", path)
@@ -100,6 +101,7 @@ func NewToken(username, passwd, path string) (*Token, error) {
 
 // Dump is used to save token information
 func (token *Token) Dump(path string) error {
+	logger.Debugf("saving token to %s", path)
 	f, err := os.OpenFile(path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("failed to open token json: %v", err)

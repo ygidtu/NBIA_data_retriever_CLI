@@ -7,6 +7,11 @@ import (
 )
 
 func newClient(proxy string) *http.Client {
+	logger.Debugf("initializing http request client")
+	if proxy != "" {
+		logger.Debug("using proxy %s", proxy)
+	}
+
 	client := &http.Client{}
 	// using proxy
 	if proxy != "" {
