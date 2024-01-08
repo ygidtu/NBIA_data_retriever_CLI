@@ -53,7 +53,9 @@ func main() {
 		if err != nil {
 			logger.Fatalf("failed to create output directory: %v", err)
 		}
-		token, err = NewToken(options.Username, options.Password, filepath.Join(options.Output, "token.json"))
+		token, err = NewToken(
+			options.Username, options.Password,
+			filepath.Join(options.Output, fmt.Sprintf("%s.json", options.Username)))
 
 		if err != nil {
 			logger.Fatal(err)
