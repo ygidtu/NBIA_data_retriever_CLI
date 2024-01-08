@@ -3,48 +3,6 @@
 > A simple replacement of NBIA data retriever.
 
 ---
-## Installation
-
-1. using the binary from this repository
-2. compile from source
-
-```bash
-git clone https://github.com/ygidtu/NBIA_data_retriever_CLI.git
-cd NBIA_data_retriever_CLI
-go mod tidy   # prepare the dependencies
-
-# check the build script arguments
-python build.py --help
-
-# build for current platform
-python build.py
-
-# build for most command platforms
-python build.py --common
-
-# build for specific platform and architecture
-python build.py --platform linux --arch amd64
-
-# build for all platforms
-python build.py --all
-```
-
-3. using docker
-
-   1. build docker image from source
-
-    ```bash
-    git clone https://github.com/ygidtu/NBIA_data_retriever_CLI.git
-    cd NBIA_data_retriever_CLI
-    docker build -t nbia .
-    ```
-
-    2. running docker
-
-    ```bash
-    docker run --rm -v $PWD:$PWD -w $PWD nbia --help
-    ```
-
 
 ## Command line usage
 
@@ -54,7 +12,7 @@ SYNOPSIS:
                             [--input|-i <string>] [--meta|-m]
                             [--meta-url <string>] [--output|-s <string>]
                             [--passwd|-w <string>] [--processes|-p <int>]
-                            [--proxy|-x <string>] [--save-log]
+                            [--proxy|-x <string>] [--timeout|-t <int>]
                             [--token-url <string>] [--user|-u <string>]
                             [--version|-v] [<args>]
 
@@ -78,8 +36,6 @@ OPTIONS:
     --processes|-p <int>    start how many download at same time (default: 1)
 
     --proxy|-x <string>     the proxy to use [http, socks5://user:passwd@host:port] (default: "")
-
-    --save-log              save debug log info to file (default: false)
 
     --token-url <string>    the api url of login token (default: "https://services.cancerimagingarchive.net/nbia-api/oauth/token")
 

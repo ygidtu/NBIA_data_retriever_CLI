@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/DavidGamba/go-getoptions"
 	"os"
-	"path/filepath"
 )
 
 var (
@@ -28,7 +27,6 @@ type Options struct {
 	MetaUrl    string
 	TokenUrl   string
 	ImageUrl   string
-	SaveLog    bool
 
 	opt *getoptions.GetOpt
 }
@@ -36,14 +34,12 @@ type Options struct {
 func InitOptions() *Options {
 	opt := &Options{opt: getoptions.New()}
 
-	setLogger(false, "")
+	setLogger(false)
 
 	opt.opt.BoolVar(&opt.Help, "help", false, opt.opt.Alias("h"),
 		opt.opt.Description("show help information"))
 	opt.opt.BoolVar(&opt.Debug, "debug", false,
 		opt.opt.Description("show more info"))
-	opt.opt.BoolVar(&opt.SaveLog, "save-log", false,
-		opt.opt.Description("save debug log info to file"))
 	opt.opt.BoolVar(&opt.Version, "version", false, opt.opt.Alias("v"),
 		opt.opt.Description("show version information"))
 	opt.opt.StringVar(&opt.Input, "input", "", opt.opt.Alias("i"),
@@ -64,7 +60,7 @@ func InitOptions() *Options {
 		opt.opt.Description("the api url of login token"))
 	opt.opt.StringVar(&opt.MetaUrl, "meta-url", MetaUrl,
 		opt.opt.Description("the api url get meta data"))
-	opt.opt.StringVar(&opt.ImageUrl, "image-url", ImageUrl,
+	opt.opt.StringVar(&opt.MetaUrl, "image-url", ImageUrl,
 		opt.opt.Description("the api url to download image data"))
 
 	_, err := opt.opt.Parse(os.Args[1:])
@@ -72,8 +68,8 @@ func InitOptions() *Options {
 		logger.Fatal(err)
 	}
 
-	if opt.Debug || opt.SaveLog {
-		setLogger(opt.Debug, filepath.Join(opt.Output, "progress.log"))
+	if opt.Debug {
+		setLogger(opt.Debug)
 	}
 
 	if opt.opt.Called("help") || len(os.Args) < 2 {
