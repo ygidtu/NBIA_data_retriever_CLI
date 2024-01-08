@@ -1,161 +1,153 @@
 package main
 
 import (
-	"bytes"
-	"crypto/tls"
+	"bufio"
 	"encoding/json"
-
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
-
-	"github.com/rs/zerolog/log"
-
-	"fmt"
-
-	"io/ioutil"
-
-	"net/url"
-
 	"strings"
-
-	"net/http"
 )
 
-// FileInfo is struct handle all the information of one tcia file
-type FileInfo struct {
-	URL         string
-	Collection  string
-	PatientID   string
-	StudyUID    string
-	SeriesUID   string
-	Size        int64
-	NumOfImages int
-	Date        string
-	Total       []string
+// decodeTCIA is used to decode the tcia file
+func decodeTCIA(path string) []*FileInfo {
+	logger.Debugf("decoding tcia file: %s", path)
+	res := make([]*FileInfo, 0)
+
+	f, err := os.Open(path)
+
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	scanner := bufio.NewScanner(f)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if !strings.ContainsAny(line, "=") {
+			logger.Debugf("tcia file id: %s", line)
+			url_, err := makeURL(MetaUrl, map[string]interface{}{"SeriesInstanceUID": line})
+			req, err := http.NewRequest("GET", url_, nil)
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+
+			resp, err := client.Do(req)
+			if err != nil {
+				logger.Errorf("failed to do request: %v", err)
+				continue
+			}
+
+			content, err := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			if err != nil {
+				logger.Errorf("failed to read response data: %v", err)
+				continue
+			}
+
+			files := make([]*FileInfo, 0)
+			err = json.Unmarshal(content, &files)
+			if err != nil {
+				logger.Errorf("failed to parse response data: %v", err)
+				logger.Debugf("%s", content)
+			}
+
+			res = append(res, files...)
+		}
+	}
+
+	return res
 }
 
-// Get main API to decode the file information
-func (info *FileInfo) Get() {
-	log.Info().Msgf("Getting %s", info.URL)
-	resp, err := http.Post(info.URL, "application/x-www-form-urlencoded; charset=ISO-8859-1", bytes.NewReader([]byte("")))
-
-	if err != nil {
-		log.Error().Msgf("%v", err)
-	}
-
-	content, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Error().Msgf("%v", err)
-	}
-
-	data := strings.Split(string(content), "|")
-	info.Total = data
-
-	if len(data) < 11 {
-		log.Error().Msgf("%v less than 11 elements", data)
-	}
-
-	info.Collection = data[0]
-	info.PatientID = data[1]
-	info.StudyUID = data[2]
-	info.SeriesUID = data[3]
-
-	if size, err := strconv.ParseInt(data[6], 10, 64); err != nil {
-		log.Error().Msgf("%v", err)
-	} else {
-		info.Size = int64(size)
-	}
-
-	info.Date = data[11]
-
-	log.Printf("%v", info)
+type FileInfo struct {
+	NumberOfImages     string `json:"Number of Images"`
+	SOPClassUID        string `json:"SOP Class UID"`
+	Manufacturer       string `json:"Manufacturer"`
+	DataDescriptionURI string `json:"Data Description URI"`
+	LicenseURL         string `json:"License URL"`
+	AnnotationSize     string `json:"Annotation Size"`
+	Collection         string `json:"Collection"`
+	StudyDescription   string `json:"Study Description"`
+	SeriesUID          string `json:"Series UID"`
+	StudyUID           string `json:"Study UID"`
+	LicenseName        string `json:"License Name"`
+	StudyDate          string `json:"Study Date"`
+	SeriesDescription  string `json:"Series Description"`
+	Modality           string `json:"Modality"`
+	RdPartyAnalysis    string `json:"3rd Party Analysis"`
+	FileSize           string `json:"File Size"`
+	SubjectID          string `json:"Subject ID"`
+	SeriesNumber       string `json:"Series Number"`
 }
 
 // GetOutput construct the output directory
-func (info *FileInfo) GetOutput(output string) string {
-	outputDir := filepath.Join(output, info.Collection, info.PatientID, info.StudyUID, info.Date, info.SeriesUID)
+func (info *FileInfo) getOutput(output string) string {
+	outputDir := filepath.Join(output, info.SubjectID, info.StudyDate)
 
 	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
 		if err = os.MkdirAll(outputDir, 0755); err != nil {
-			log.Error().Msgf("%v", err)
+			logger.Fatal(err)
 		}
 	}
 
 	return outputDir
 }
 
-// Download is real function to downlaod file
-func (info *FileInfo) Download(output, username, password string) error {
+func (info *FileInfo) MetaFile(output string) string {
+	return filepath.Join(info.getOutput(output), fmt.Sprintf("%s.json", info.SeriesUID))
+}
 
-	log.Debug().Msgf("%v", info)
+func (info *FileInfo) DcimFiles(output string) string {
+	return filepath.Join(info.getOutput(output), fmt.Sprintf("%s.zip", info.SeriesUID))
+}
 
-	outputFile := info.GetOutput(output)
-
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true},
-		ResponseHeaderTimeout: timeout,
+func (info *FileInfo) GetMeta(output string) error {
+	logger.Debugf("getting meta information and save to %s", output)
+	f, err := os.OpenFile(info.MetaFile(output), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("failed to open meta file %s: %v", info.MetaFile(output), err)
 	}
-
-	if proxy != "" {
-		proxyURL, err := url.Parse(proxy)
-		if err != nil {
-			return err
-		}
-
-		tr = &http.Transport{
-			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
-			Proxy:                 http.ProxyURL(proxyURL),
-			ResponseHeaderTimeout: timeout,
-		}
+	content, err := json.MarshalIndent(info, "", "\t")
+	if err != nil {
+		return fmt.Errorf("failed to marshall meta: %v", err)
 	}
-
-	// custom the request form
-	form := url.Values{}
-	form.Add("Range", fmt.Sprintf("bytes=0-"))
-	form.Add("hasAnnotation", "false")
-	form.Add("includeAnnotation", "true")
-	form.Add("seriesUid", info.SeriesUID)
-	form.Add("sopUids", "")
-
-	if username != "" && password != "" {
-		form.Add("userId", username)
-		form.Add("password", password)
-	}
-
-	req, err := http.NewRequest("POST", baseURL, strings.NewReader(form.Encode()))
+	_, err = f.Write(content)
 	if err != nil {
 		return err
 	}
-	// custom the request header
-	req.Header.Add("password", "")
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded; charset=ISO-8859-1")
-	req.Header.Add("Connection", "Keep-Alive")
+	return f.Close()
+}
 
-	log.Info().Msgf("Download %s to %s", info.SeriesUID, outputFile)
-
-	client := &http.Client{Transport: tr, Timeout: timeout}
+// Download is real function to download file
+func (info *FileInfo) Download(output string) error {
+	logger.Debugf("getting image file to %s", output)
+	url_, err := makeURL(ImageUrl, map[string]interface{}{"SeriesInstanceUID": info.SeriesUID})
+	req, err := http.NewRequest("GET", url_, nil)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to do request: %v", err)
 	}
-
-	return UnTar(outputFile, resp.Body)
-}
-
-// ToJSON is used to save downlaod file information and log the download progress
-func (info *FileInfo) ToJSON(output string) {
-	rankingsJSON, _ := json.MarshalIndent(info, "", "    ")
-	err := ioutil.WriteFile(fmt.Sprintf("%s.json", info.GetOutput(output)), rankingsJSON, 0644)
+	defer resp.Body.Close()
 
 	if err != nil {
-		log.Error().Msgf("%v", err)
+		return fmt.Errorf("failed to read response data: %v", err)
 	}
-}
+	f, err := os.OpenFile(info.DcimFiles(output), os.O_TRUNC|os.O_WRONLY|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %v", err)
+	}
 
-// ToString is used to convert file info as string for human
-func (info *FileInfo) ToString() string {
-	return fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s", info.URL, info.Collection, info.PatientID, info.StudyUID, info.SeriesUID, info.Size, info.NumOfImages, info.Date)
+	bar := bytesBar(resp.ContentLength, info.SeriesUID)
+	if fSize, err := strconv.Atoi(info.FileSize); err == nil {
+		bar = bytesBar(int64(fSize), info.SeriesUID)
+	}
+	_, err = io.Copy(io.MultiWriter(f, bar), resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write data: %v", err)
+	}
+	return f.Close()
 }

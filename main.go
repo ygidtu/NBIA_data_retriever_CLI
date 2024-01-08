@@ -2,30 +2,30 @@ package main
 
 import (
 	"fmt"
+	"go.uber.org/zap"
+	"net/http"
 	"os"
 	"os/signal"
-	"strings"
+	"path/filepath"
 	"sync"
 	"syscall"
-	"time"
-
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-	"github.com/voxelbrain/goptions"
 )
 
 var (
-	timeout = time.Duration(120000 * time.Second)
-	proxy   = ""
-	baseURL = ""
-	output  = ""
-	meta    = false
+	// version and build info
+	buildStamp string
+	gitHash    string
+	goVersion  string
+	version    string
+	client     *http.Client
+	token      *Token
+	logger     *zap.SugaredLogger
 )
 
 // SetupCloseHandler creates a 'listener' on a new goroutine which will notify the
 // program if it receives an interrupt from the OS. We then handle this by calling
-// our clean up procedure and exiting the program.
-func SetupCloseHandler() {
+// our clean-up procedure and exiting the program.
+func setupCloseHandler() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -35,84 +35,54 @@ func SetupCloseHandler() {
 	}()
 }
 
-// SetLogger as name says
-func SetLogger() zerolog.Logger {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-
-	output := zerolog.ConsoleWriter{
-		Out:        os.Stderr,
-		TimeFormat: time.RFC3339Nano,
-		NoColor:    false,
-	}
-	output.FormatLevel = func(i interface{}) string {
-		return strings.ToUpper(fmt.Sprintf("| %-6s |", i))
-	}
-
-	log.Logger = log.Output(output)
-
-	return zerolog.New(output).With().Timestamp().Logger()
-}
-
 func main() {
-	SetupCloseHandler()
-	SetLogger()
+	setupCloseHandler()
 
-	options := struct {
-		InputFile string `goptions:"-i, --input, description='Path to tcia file'"`
-		Output    string `goptions:"-o, --output, description='Output directory, or output file when --meta enabled'"`
-		Proxy     string `goptions:"-x, --proxy, description='Proxy'"`
-		Timeout   int64  `goptions:"-t, --timeout, description='Due to limitation of target server, please set this timeout value as big as possible'"`
-		Num       int    `goptions:"-p, --process, description='Start how many download at same time'"`
-		Meta      bool   `goptions:"-m, --meta, description='Get Meta info of all files'"`
-		Username  string `goptions:"-u, --username, description='Username for control data'"`
-		Password  string `goptions:"-w, --passwd, description='Password for control data'"`
-		Version   bool   `goptions:"-v, --version, description='Show version'"`
-		Debug     bool   `goptions:"--debug, description='Show debug info'"`
-
-		Help goptions.Help `goptions:"--help, description='Show this help'"`
-	}{
-		Output:  "downloads",
-		Proxy:   "",
-		Timeout: 1200000,
-		Num:     1,
-		Meta:    false,
-	}
-	goptions.ParseAndFail(&options)
-
-	if len(os.Args) <= 1 {
-		goptions.PrintHelp()
-		os.Exit(0)
-	}
+	var options = InitOptions()
 
 	if options.Version {
-		println("Current version is 0.2.3-beta")
+		logger.Infof("Current version: %s", version)
+		logger.Infof("Git Commit Hash: %s", gitHash)
+		logger.Infof("UTC Build Time : %s", buildStamp)
+		logger.Infof("Golang Version : %s", goVersion)
+		os.Exit(0)
 	} else {
-		proxy = options.Proxy
-		timeout = time.Duration(options.Timeout) * time.Second
-		output = options.Output
-		meta = options.Meta
+		client = newClient(options.Proxy)
+
+		err := os.MkdirAll(options.Output, os.ModePerm)
+		if err != nil {
+			logger.Fatalf("failed to create output directory: %v", err)
+		}
+		token, err = NewToken(
+			options.Username, options.Password,
+			filepath.Join(options.Output, fmt.Sprintf("%s.json", options.Username)))
+
+		if err != nil {
+			logger.Fatal(err)
+		}
+
 		var wg sync.WaitGroup
+		files := decodeTCIA(options.Input)
 
-		files := DecodeTCIA(options.InputFile)
-
-		wg.Add(options.Num)
+		wg.Add(options.Concurrent)
 		inputChan := make(chan *FileInfo, 5)
-		for i := 0; i < options.Num; i++ {
+		for i := 0; i < options.Concurrent; i++ {
 
 			go func(input chan *FileInfo) {
 				defer wg.Done()
 				for i := range input {
-					i.Get()
-					if _, err := os.Stat(fmt.Sprintf("%s.json", i.GetOutput(output))); os.IsNotExist(err) {
-						if !meta {
-							if err := i.Download(output, options.Username, options.Password); err != nil {
-								log.Warn().Msgf("Download %s failed - %s", i.SeriesUID, err)
+					if _, err := os.Stat(i.MetaFile(options.Output)); os.IsNotExist(err) {
+						if !options.Meta {
+							if err := i.Download(options.Output); err != nil {
+								logger.Warnf("Download %s failed - %s", i.SeriesUID, err)
 							} else {
-								i.ToJSON(output)
+								if err := i.GetMeta(options.Output); err != nil {
+									logger.Warnf("save meta info %s failed - %s", i.SeriesUID, err)
+								}
 							}
 						}
 					} else {
-						log.Info().Msgf("Skip %s", i.SeriesUID)
+						logger.Infof("Skip %s", i.SeriesUID)
 					}
 				}
 			}(inputChan)
@@ -123,9 +93,5 @@ func main() {
 		}
 		close(inputChan)
 		wg.Wait()
-
-		if meta {
-			ToJSON(files, fmt.Sprintf("%s.json", output))
-		}
 	}
 }
