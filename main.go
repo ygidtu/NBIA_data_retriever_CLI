@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,14 +17,12 @@ var (
 	goVersion  string
 	version    string
 	client     *http.Client
-	token      *Token
-	logger     *zap.SugaredLogger
 )
 
 // SetupCloseHandler creates a 'listener' on a new goroutine which will notify the
 // program if it receives an interrupt from the OS. We then handle this by calling
 // our clean-up procedure and exiting the program.
-func setupCloseHandler() {
+func SetupCloseHandler() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -36,7 +33,7 @@ func setupCloseHandler() {
 }
 
 func main() {
-	setupCloseHandler()
+	SetupCloseHandler()
 
 	var options = InitOptions()
 
@@ -47,13 +44,13 @@ func main() {
 		logger.Infof("Golang Version : %s", goVersion)
 		os.Exit(0)
 	} else {
-		client = newClient(options.Proxy)
+		client = newClient(options.Proxy, options.Timeout)
 
 		err := os.MkdirAll(options.Output, os.ModePerm)
 		if err != nil {
 			logger.Fatalf("failed to create output directory: %v", err)
 		}
-		token, err = NewToken(options.Username, options.Password, filepath.Join(options.Output, "token.json"))
+		token, err := NewToken(options.Username, options.Password, filepath.Join(options.Output, "token.json"))
 
 		if err != nil {
 			logger.Fatal(err)
@@ -69,14 +66,13 @@ func main() {
 			go func(input chan *FileInfo) {
 				defer wg.Done()
 				for i := range input {
-					if _, err := os.Stat(i.MetaFile(options.Output)); os.IsNotExist(err) {
+					i.Get(token.AccessToken)
+					if _, err := os.Stat(fmt.Sprintf("%s.json", i.GetOutput(options.Output))); os.IsNotExist(err) {
 						if !options.Meta {
-							if err := i.Download(options.Output); err != nil {
+							if err := i.Download(options.Output, options.Username, options.Password); err != nil {
 								logger.Warnf("Download %s failed - %s", i.SeriesUID, err)
 							} else {
-								if err := i.GetMeta(options.Output); err != nil {
-									logger.Warnf("save meta info %s failed - %s", i.SeriesUID, err)
-								}
+								i.ToJSON(options.Output)
 							}
 						}
 					} else {
@@ -91,5 +87,9 @@ func main() {
 		}
 		close(inputChan)
 		wg.Wait()
+
+		if options.Meta {
+			ToJSON(files, fmt.Sprintf("%s.json", options.Output))
+		}
 	}
 }
