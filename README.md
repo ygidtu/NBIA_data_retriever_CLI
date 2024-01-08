@@ -53,8 +53,8 @@ SYNOPSIS:
     NBIA_data_retriever_CLI [--debug] [--help|-h] [--image-url <string>]
                             [--input|-i <string>] [--meta|-m]
                             [--meta-url <string>] [--output|-s <string>]
-                            [--passwd <string>] [--processes|-p <int>]
-                            [--prompt|-w] [--proxy|-x <string>] [--save-log]
+                            [--passwd|-w <string>] [--processes|-p <int>]
+                            [--proxy|-x <string>] [--save-log]
                             [--token-url <string>] [--user|-u <string>]
                             [--version|-v] [<args>]
 
@@ -73,11 +73,9 @@ OPTIONS:
 
     --output|-s <string>    Output directory, or output file when --meta enabled (default: "./")
 
-    --passwd <string>       set password for control data in command line (default: "")
+    --passwd|-w <string>    password for control data (default: "")
 
     --processes|-p <int>    start how many download at same time (default: 1)
-
-    --prompt|-w             input password for control data (default: false)
 
     --proxy|-x <string>     the proxy to use [http, socks5://user:passwd@host:port] (default: "")
 
@@ -88,7 +86,6 @@ OPTIONS:
     --user|-u <string>      username for control data (default: "nbia_guest")
 
     --version|-v            show version information (default: false)
-
 ```
 
 This tool download files using the official API, the input file should be tcia file or just list of series instance ids.

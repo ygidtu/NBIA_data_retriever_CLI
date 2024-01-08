@@ -29,7 +29,6 @@ type Options struct {
 	TokenUrl   string
 	ImageUrl   string
 	SaveLog    bool
-	Prompt     bool
 
 	opt *getoptions.GetOpt
 }
@@ -59,10 +58,8 @@ func InitOptions() *Options {
 		opt.opt.Description("get Meta info of all files"))
 	opt.opt.StringVar(&opt.Username, "user", "nbia_guest", opt.opt.Alias("u"),
 		opt.opt.Description("username for control data"))
-	opt.opt.BoolVar(&opt.Prompt, "prompt", false, opt.opt.Alias("w"),
-		opt.opt.Description("input password for control data"))
-	opt.opt.StringVar(&opt.Password, "passwd", "",
-		opt.opt.Description("set password for control data in command line"))
+	opt.opt.StringVar(&opt.Password, "passwd", "", opt.opt.Alias("w"),
+		opt.opt.Description("password for control data"))
 	opt.opt.StringVar(&opt.TokenUrl, "token-url", TokenUrl,
 		opt.opt.Description("the api url of login token"))
 	opt.opt.StringVar(&opt.MetaUrl, "meta-url", MetaUrl,
@@ -97,14 +94,5 @@ func InitOptions() *Options {
 		ImageUrl = opt.ImageUrl
 		logger.Infof("Using custom image url: %s", ImageUrl)
 	}
-
-	if opt.Prompt {
-		logger.Infof("Please input password for %s: ", opt.Username)
-		_, err = fmt.Scanln(&opt.Password)
-		if err != nil {
-			logger.Fatalf("failed to scan prompt: %v", err)
-		}
-	}
-
 	return opt
 }
