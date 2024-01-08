@@ -4,8 +4,6 @@
 
 ---
 
-https://www.cancerimagingarchive.net/wp-content/uploads/CMB-AML_October-2023-manifest.tcia
-
 ## Command line usage
 
 ```bash
